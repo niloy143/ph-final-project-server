@@ -18,10 +18,25 @@ app.get('/', (req, res) => {
 async function run() {
     try {
         const appointmentOptionsCollection = client.db('doctorsPortal').collection('appointmentOptions');
+        const bookingsCollection = client.db('doctorsPortal').collection('bookingsCollection');
 
         app.get('/appointmentOptions', async (req, res) => {
             const appointmentOptions = await appointmentOptionsCollection.find({}).toArray();
+            const todaysBooking = await bookingsCollection.find({ appointmentDate: req.query.date }).toArray();
+            todaysBooking.forEach(booking => {
+                appointmentOptions.map(appointment => {
+                    if (booking.treatment === appointment.name) {
+                        appointment.slots = appointment.slots.filter(slot => slot !== booking.schedule)
+                    }
+                    return appointment;
+                })
+            })
             res.send(appointmentOptions);
+        })
+
+        app.post('/bookings', async (req, res) => {
+            const feedback = await bookingsCollection.insertOne(req.body);
+            res.send(feedback);
         })
     }
     catch (err) {
