@@ -28,7 +28,6 @@ async function run() {
                     if (booking.treatment === appointment.name) {
                         appointment.slots = appointment.slots.filter(slot => slot !== booking.schedule)
                     }
-                    return appointment;
                 })
             })
             res.send(appointmentOptions);
