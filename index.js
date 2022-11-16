@@ -22,8 +22,8 @@ async function run() {
 
         app.get('/appointmentOptions', async (req, res) => {
             const appointmentOptions = await appointmentOptionsCollection.find({}).toArray();
-            const todaysBooking = await bookingsCollection.find({ appointmentDate: req.query.date }).toArray();
-            todaysBooking.forEach(booking => {
+            const bookingsOfTheDay = await bookingsCollection.find({ appointmentDate: req.query.date }).toArray();
+            bookingsOfTheDay.forEach(booking => {
                 appointmentOptions.map(appointment => {
                     if (booking.treatment === appointment.name) {
                         appointment.slots = appointment.slots.filter(slot => slot !== booking.schedule)
@@ -34,8 +34,16 @@ async function run() {
         })
 
         app.post('/bookings', async (req, res) => {
-            const feedback = await bookingsCollection.insertOne(req.body);
-            res.send(feedback);
+            const { appointmentDate, email, treatment } = req.body;
+            const bookingsOfTheDay = await bookingsCollection.find({ appointmentDate: appointmentDate, email: email }).toArray();
+            const alreadyBooked = bookingsOfTheDay.find(booking => booking.treatment === treatment);
+            if (!!alreadyBooked) {
+                return res.send({ acknowledged: false, message: `You already booked ${treatment} for this day.` });
+            }
+            else {
+                const result = await bookingsCollection.insertOne(req.body);
+                res.send(result);
+            }
         })
     }
     catch (err) {
