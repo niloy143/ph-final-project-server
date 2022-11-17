@@ -1,6 +1,7 @@
 require('dotenv').config();
 const cors = require('cors');
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion } = require('mongodb');
@@ -13,6 +14,11 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 app.get('/', (req, res) => {
     res.send({ status: 'running' })
+})
+
+app.post('/jwt', (req, res) => {
+    const token = jwt.sign(req.body, process.env.JWT_ACCESS, { expiresIn: '1h' });
+    res.send({ token });
 })
 
 async function run() {
@@ -44,6 +50,11 @@ async function run() {
                 const result = await bookingsCollection.insertOne(req.body);
                 res.send(result);
             }
+        })
+
+        app.get('/bookings', async (req, res) => {
+            const bookings = await bookingsCollection.find({ email: req.query.email }).toArray();
+            res.send(bookings);
         })
     }
     catch (err) {
