@@ -5,9 +5,24 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const tokenSecret = process.env.JWT_ACCESS;
 
 app.use(cors());
 app.use(express.json());
+
+const verifyJWT = (req, res, next) => {
+    if (!(req.headers.authorization)) {
+        return res.status(403).send({ access: 'bad auth' });
+    }
+    const token = req.headers.authorization.split('"')[1];
+    jwt.verify(token, tokenSecret, (err, decoded) => {
+        if (err) {
+            return res.status(403).send({ access: 'bad auth' });
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.sq5icdb.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
@@ -17,7 +32,7 @@ app.get('/', (req, res) => {
 })
 
 app.post('/jwt', (req, res) => {
-    const token = jwt.sign(req.body, process.env.JWT_ACCESS, { expiresIn: '1h' });
+    const token = jwt.sign(req.body, tokenSecret, { expiresIn: '1h' });
     res.send({ token });
 })
 
@@ -52,7 +67,10 @@ async function run() {
             }
         })
 
-        app.get('/bookings', async (req, res) => {
+        app.get('/bookings', verifyJWT, async (req, res) => {
+            if(req.decoded.email !== req.query.email) {
+                return res.status(401).send({access: 'forbidden'});
+            }
             const bookings = await bookingsCollection.find({ email: req.query.email }).toArray();
             res.send(bookings);
         })
