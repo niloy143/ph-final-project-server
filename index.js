@@ -40,6 +40,7 @@ async function run() {
     try {
         const appointmentOptionsCollection = client.db('doctorsPortal').collection('appointmentOptions');
         const bookingsCollection = client.db('doctorsPortal').collection('bookingsCollection');
+        const usersCollection = client.db('doctorsPortal').collection('usersCollection');
 
         app.get('/appointmentOptions', async (req, res) => {
             const appointmentOptions = await appointmentOptionsCollection.find({}).toArray();
@@ -68,11 +69,18 @@ async function run() {
         })
 
         app.get('/bookings', verifyJWT, async (req, res) => {
-            if(req.decoded.email !== req.query.email) {
-                return res.status(401).send({access: 'forbidden'});
+            if (req.decoded.email !== req.query.email) {
+                return res.status(401).send({ access: 'forbidden' });
             }
             const bookings = await bookingsCollection.find({ email: req.query.email }).toArray();
             res.send(bookings);
+        })
+
+        app.post('/users', async (req, res) => {
+            const result = await usersCollection.findOne({ uid: req.body.uid });
+            if (!result) {
+                usersCollection.insertOne(req.body)
+            }
         })
     }
     catch (err) {
