@@ -77,10 +77,25 @@ async function run() {
         })
 
         app.post('/users', async (req, res) => {
-            const result = await usersCollection.findOne({ uid: req.body.uid });
-            if (!result) {
+            const user = await usersCollection.findOne({ uid: req.body.uid });
+            if (!user) {
                 usersCollection.insertOne(req.body)
             }
+        })
+
+        app.get('/users', verifyJWT, async (req, res) => {
+            const user = await usersCollection.findOne({ uid: req.query.adminId });
+            if (req.decoded.uid !== req.query.adminId || user.role !== 'admin') {
+                return res.status(403).send({ access: 'forbidden' })
+            }
+            const users = await usersCollection.find({}).toArray();
+            res.send(users)
+        })
+
+        app.get('/user/:id', async (req, res) => {
+            const user = await usersCollection.findOne({ uid: req.params.id });
+            const isAdmin = !!(user?.role === 'admin');
+            res.send({ isAdmin });
         })
     }
     catch (err) {
