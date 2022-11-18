@@ -4,7 +4,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const tokenSecret = process.env.JWT_ACCESS;
 
 app.use(cors());
@@ -12,12 +12,12 @@ app.use(express.json());
 
 const verifyJWT = (req, res, next) => {
     if (!(req.headers.authorization)) {
-        return res.status(403).send({ access: 'bad auth' });
+        return res.status(401).send({ access: 'bad auth' });
     }
     const token = req.headers.authorization.split('"')[1];
     jwt.verify(token, tokenSecret, (err, decoded) => {
         if (err) {
-            return res.status(403).send({ access: 'bad auth' });
+            return res.status(401).send({ access: 'bad auth' });
         }
         req.decoded = decoded;
         next();
@@ -68,9 +68,17 @@ async function run() {
             }
         })
 
+        app.delete('/bookings/:id', verifyJWT, async (req, res) => {
+            if (req.decoded.email !== req.query.email) {
+                return res.status(403).send({ access: 'forbidden' });
+            }
+            const result = await bookingsCollection.deleteOne({ _id: ObjectId(req.params.id) });
+            res.send(result);
+        })
+
         app.get('/bookings', verifyJWT, async (req, res) => {
             if (req.decoded.email !== req.query.email) {
-                return res.status(401).send({ access: 'forbidden' });
+                return res.status(403).send({ access: 'forbidden' });
             }
             const bookings = await bookingsCollection.find({ email: req.query.email }).toArray();
             res.send(bookings);
