@@ -97,6 +97,18 @@ async function run() {
             const isAdmin = !!(user?.role === 'admin');
             res.send({ isAdmin });
         })
+
+        app.put('/user', verifyJWT, async (req, res) => {
+            const admin = await usersCollection.findOne({ uid: req.query.admin });
+            if (req.decoded.uid !== req.query.admin || admin.role !== 'admin') {
+                return res.status(403).send({ access: 'forbidden' })
+            }
+            const filter = { uid: req.query.candidate };
+            const updateRole = { $set: { role: 'admin', promotedBy: req.decoded.uid } };
+            const options = { upsert: true };
+            const result = await usersCollection.updateOne(filter, updateRole, options);
+            res.send(result)
+        })
     }
     catch (err) {
         console.error(err)
