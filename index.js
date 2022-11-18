@@ -104,7 +104,7 @@ async function run() {
                 return res.status(403).send({ access: 'forbidden' })
             }
             const filter = { uid: req.query.candidate };
-            const updateRole = { $set: { role: 'admin', promotedBy: req.decoded.uid } };
+            const updateRole = { $set: { role: `${req.query.role === 'admin' ? 'user' : 'admin'}`, roleChangedBy: req.decoded.uid } };
             const options = { upsert: true };
             const result = await usersCollection.updateOne(filter, updateRole, options);
             res.send(result)
