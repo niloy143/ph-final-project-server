@@ -12,12 +12,12 @@ app.use(express.json());
 
 const verifyJWT = (req, res, next) => {
     if (!(req.headers.authorization)) {
-        return res.status(401).send({ access: 'bad auth' });
+        return res.status(401).send({ access: 'denied' });
     }
     const token = req.headers.authorization.split(' ')[1];
     jwt.verify(token, tokenSecret, (err, decoded) => {
         if (err) {
-            return res.status(401).send({ access: 'bad auth' });
+            return res.status(401).send({ access: 'denied' });
         }
         req.decoded = decoded;
         next();
@@ -42,6 +42,14 @@ async function run() {
         const bookingsCollection = client.db('doctorsPortal').collection('bookingsCollection');
         const usersCollection = client.db('doctorsPortal').collection('usersCollection');
         const doctorsCollection = client.db('doctorsPortal').collection('doctors');
+
+        const verifyAdmin = async (req, res, next) => {
+            const user = await usersCollection.findOne({ uid: req.decoded.uid });
+            if (!user || req.query.adminId !== user.uid || (user.role !== 'admin')) {
+                return res.status(403).send({ access: 'forbidden' })
+            }
+            next();
+        }
 
         app.get('/appointmentOptions', async (req, res) => {
             const appointmentOptions = await appointmentOptionsCollection.find({}).toArray();
@@ -85,6 +93,10 @@ async function run() {
             res.send(bookings);
         })
 
+        app.get('/admin', verifyJWT, verifyAdmin, async (req, res) => {
+            res.send({ isAdmin: true });
+        })
+
         app.post('/users', async (req, res) => {
             const user = await usersCollection.findOne({ uid: req.body.uid });
             if (!user) {
@@ -93,28 +105,11 @@ async function run() {
         })
 
         app.get('/users', verifyJWT, async (req, res) => {
-            const user = await usersCollection.findOne({ uid: req.query.adminId });
-            if (req.decoded.uid !== req.query.adminId || user.role !== 'admin') {
-                return res.status(403).send({ access: 'forbidden' })
-            }
             const users = await usersCollection.find({}).toArray();
-            res.send(users)
+            res.send(users);
         })
 
-        app.get('/user/:id', verifyJWT, async (req, res) => {
-            const user = await usersCollection.findOne({ uid: req.params.id });
-            if (req.decoded.uid !== req.params.id || user.role !== 'admin') {
-                return res.status(403).send({ access: 'forbidden' })
-            }
-            const isAdmin = !!(user?.role === 'admin');
-            res.send({ isAdmin });
-        })
-
-        app.put('/user', verifyJWT, async (req, res) => {
-            const admin = await usersCollection.findOne({ uid: req.query.admin });
-            if (req.decoded.uid !== req.query.admin || admin.role !== 'admin') {
-                return res.status(403).send({ access: 'forbidden' })
-            }
+        app.put('/user', verifyJWT, verifyAdmin, async (req, res) => {
             const filter = { uid: req.query.candidate };
             const updateRole = { $set: { role: `${req.query.role === 'admin' ? 'user' : 'admin'}`, roleChangedBy: req.decoded.uid } };
             const options = { upsert: true };
@@ -122,19 +117,24 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/doctors', async (req, res) => {
+        app.get('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
             const doctors = await doctorsCollection.find({}).toArray();
             res.send(doctors);
         })
 
-        app.post('/doctors', async (req, res) => {
+        app.post('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await doctorsCollection.insertOne(req.body);
             res.send(result);
         })
 
-        app.get('/doctor/specialties', async (req, res) => {
+        app.get('/doctor/specialties', verifyJWT, verifyAdmin, async (req, res) => {
             const specialties = await appointmentOptionsCollection.find({}).project({ name: 1 }).toArray();
             res.send(specialties);
+        })
+
+        app.delete('/doctor/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const result = await doctorsCollection.deleteOne({ _id: ObjectId(req.params.id) });
+            res.send(result);
         })
     }
     catch (err) {
