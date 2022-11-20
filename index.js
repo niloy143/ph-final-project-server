@@ -93,6 +93,14 @@ async function run() {
             res.send(bookings);
         })
 
+        app.get('/booking/:id', verifyJWT, async (req, res) => {
+            if (req.decoded.email !== req.query.email) {
+                return res.status(403).send({ access: 'forbidden' });
+            }
+            const booking = await bookingsCollection.findOne({ _id: ObjectId(req.params.id) });
+            res.send(booking);
+        })
+
         app.get('/admin', verifyJWT, verifyAdmin, async (req, res) => {
             res.send({ isAdmin: true });
         })
