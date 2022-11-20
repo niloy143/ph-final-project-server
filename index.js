@@ -14,7 +14,7 @@ const verifyJWT = (req, res, next) => {
     if (!(req.headers.authorization)) {
         return res.status(401).send({ access: 'bad auth' });
     }
-    const token = req.headers.authorization.split('"')[1];
+    const token = req.headers.authorization.split(' ')[1];
     jwt.verify(token, tokenSecret, (err, decoded) => {
         if (err) {
             return res.status(401).send({ access: 'bad auth' });
@@ -100,8 +100,11 @@ async function run() {
             res.send(users)
         })
 
-        app.get('/user/:id', async (req, res) => {
+        app.get('/user/:id', verifyJWT, async (req, res) => {
             const user = await usersCollection.findOne({ uid: req.params.id });
+            if (req.decoded.uid !== req.params.id || user.role !== 'admin') {
+                return res.status(403).send({ access: 'forbidden' })
+            }
             const isAdmin = !!(user?.role === 'admin');
             res.send({ isAdmin });
         })
