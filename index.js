@@ -3,6 +3,7 @@ const cors = require('cors');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const app = express();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const tokenSecret = process.env.JWT_ACCESS;
@@ -32,8 +33,23 @@ app.get('/', (req, res) => {
 })
 
 app.post('/jwt', (req, res) => {
-    const token = jwt.sign(req.body, tokenSecret, { expiresIn: '1h' });
+    const token = jwt.sign(req.body, tokenSecret, { expiresIn: '7d' });
     res.send({ token });
+})
+
+app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+    const { price } = req.body;
+    const amount = price * 100;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: "usd",
+        automatic_payment_methods: {
+            enabled: true
+        }
+    })
+
+    res.send({ clientSecret: paymentIntent.client_secret });
 })
 
 async function run() {
@@ -42,6 +58,7 @@ async function run() {
         const bookingsCollection = client.db('doctorsPortal').collection('bookingsCollection');
         const usersCollection = client.db('doctorsPortal').collection('usersCollection');
         const doctorsCollection = client.db('doctorsPortal').collection('doctors');
+        const paymentsCollection = client.db('doctorsPortal').collection('payments');
 
         const verifyAdmin = async (req, res, next) => {
             const user = await usersCollection.findOne({ uid: req.decoded.uid });
@@ -143,6 +160,13 @@ async function run() {
         app.delete('/doctor/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await doctorsCollection.deleteOne({ _id: ObjectId(req.params.id) });
             res.send(result);
+        })
+
+        app.post('/payments', verifyJWT, async (req, res) => {
+            const paidResult = await bookingsCollection.updateOne({ _id: ObjectId(req.body._id) }, { $set: { paid: true } });
+            const paymentResult = await paymentsCollection.insertOne(req.body);
+
+            res.send({ paidResult, paymentResult });
         })
     }
     catch (err) {
